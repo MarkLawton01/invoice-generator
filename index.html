@@ -174,6 +174,9 @@
     body.preview #pv { display:block; position:fixed; inset:0; z-index:4; overflow:auto; background:var(--bg);
                        padding:64px 12px calc(92px + env(safe-area-inset-bottom)); }
     #pv .paper { position:static; width:720px; min-height:0; }
+    /* suggestion chips (replace the browser's floating suggestion popup) */
+    .sugg { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+    .sugg button { font-size:14px; padding:7px 12px; border-radius:99px; background:var(--cur); border-color:var(--ring); color:var(--ink); }
   }
 </style>
 </head>
@@ -375,6 +378,7 @@ function renderTrips() {
       </div>
       <label class="field trip-price"><span>Price (${sym()})</span><input data-i="${i}" data-k="price" type="number" min="0" step="any" value="${esc(t.price)}"></label>
     </div>`).join('');
+  phoneSuggest();
 }
 
 const tripHead = t => [(t.type || '').trim(), fmtDate(t.date)].filter(Boolean).join('  ·  ');
@@ -576,6 +580,45 @@ $('previewBtn').onclick = () => setPreview(!document.body.classList.contains('pr
 PHONE.addEventListener('change', () => { if (!PHONE.matches) setPreview(false); });
 addEventListener('resize', fitPaper);
 addEventListener('popstate', () => { closeDrawer(true); setPreview(false, true); });
+
+/* ---------- phone: suggestion chips ----------
+   Android draws <datalist> suggestions as a floating popup that lingers and covers the field.
+   On phones the list= link is swapped for chips under the field; desktop keeps the datalist. */
+function phoneSuggest() {
+  document.querySelectorAll(PHONE.matches ? 'input[list]' : 'input[data-suggest]').forEach(el => {
+    if (PHONE.matches) { el.dataset.suggest = el.getAttribute('list'); el.removeAttribute('list'); }
+    else { el.setAttribute('list', el.dataset.suggest); delete el.dataset.suggest; }
+  });
+}
+const sugg = document.createElement('div');
+sugg.className = 'sugg';
+function showSugg(el) {
+  const q = el.value.trim().toLowerCase();
+  const opts = [...$(el.dataset.suggest).options].map(o => o.value)
+    .filter(v => v.toLowerCase() !== q && v.toLowerCase().includes(q)).slice(0, 8);
+  if (!opts.length) { sugg.remove(); return; }
+  sugg.innerHTML = opts.map(v => `<button type="button">${esc(v)}</button>`).join('');
+  sugg.target = el;
+  if (el.nextElementSibling !== sugg) el.after(sugg);
+}
+document.addEventListener('focusin', e => {
+  if (!PHONE.matches || e.target.tagName !== 'INPUT') return;
+  if (e.target.hasAttribute('list')) phoneSuggest();
+  if (e.target.dataset.suggest) showSugg(e.target);
+});
+document.addEventListener('input', e => { if (e.target === sugg.target && PHONE.matches) showSugg(e.target); });
+document.addEventListener('focusout', e => { if (e.target === sugg.target) sugg.remove(); });
+sugg.addEventListener('pointerdown', e => e.preventDefault());   // keep focus in the field while tapping a chip
+sugg.addEventListener('click', e => {
+  const b = e.target.closest('button'), el = sugg.target;
+  if (!b || !el) return;
+  el.value = b.textContent;
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+  sugg.remove();
+  el.blur();                                                     // picked: close the keyboard
+});
+PHONE.addEventListener('change', phoneSuggest);
 $('search').addEventListener('input', renderDrawer);
 $('onlyUnpaid').addEventListener('change', renderDrawer);
 $('custList').addEventListener('change', e => {
