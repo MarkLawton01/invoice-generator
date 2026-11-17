@@ -2,8 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Invoice Generator</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#ffffff">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <script src="vendor/jspdf.umd.min.js"></script>
 <script src="vendor/jspdf.plugin.autotable.min.js"></script>
 <script>
@@ -129,6 +133,48 @@
   .p-bank .r { display:grid; grid-template-columns:84px 1fr; padding:3px 0; align-items:baseline; }
   .p-bank .r span { color:var(--muted); font-size:12px; } .p-bank .r b { font-size:13px; font-weight:700; letter-spacing:.02em; }
   .p-notes { margin-top:24px; font-size:12px; color:#374151; }
+
+  /* ---------- phone layout (touch screens under 700px only; desktop is untouched) ---------- */
+  .lbl-short, .phone-ico, .phone-only, .fold-sum, .chev { display:none; }
+  @media (max-width: 700px) and (pointer: coarse) {
+    body { font-size:15px; }
+    header { padding:10px 64px 10px 14px; padding-top:max(10px, env(safe-area-inset-top)); }
+    header h1 { font-size:16px; white-space:nowrap; }
+    .left { gap:8px; min-width:0; }
+    #themeBtn { position:fixed; top:max(7px, env(safe-area-inset-top)); right:12px; padding:6px 10px; font-size:16px; }
+    #themeBtn .lbl { display:none; }
+    /* actions become a bottom bar within thumb reach */
+    .actions { position:fixed; left:0; right:0; bottom:0; display:grid; grid-template-columns:repeat(4, 1fr); gap:8px;
+               padding:8px 10px calc(8px + env(safe-area-inset-bottom)); background:var(--card); border-top:1px solid var(--line); box-shadow:0 -2px 12px rgba(0,0,0,.08); }
+    .actions button:not(#themeBtn) { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; min-height:52px; padding:6px 4px; font-size:12px; font-weight:600; }
+    .actions .ico { font-size:18px; line-height:1; }
+    .lbl-long { display:none; }
+    .lbl-short, .phone-ico { display:inline; }
+    main { padding:12px 12px calc(92px + env(safe-area-inset-bottom)); }
+    .card { padding:14px; margin-bottom:12px; }
+    input, textarea, select { font-size:16px; padding:10px 11px; }
+    .check { font-size:15px; padding:5px 0; }
+    .check input { width:22px; height:22px; }
+    .x { width:40px; height:40px; font-size:16px; }
+    .link { font-size:14px; padding:8px 0; }
+    button.small { padding:8px 12px; font-size:13px; }
+    #addTrip { width:100%; padding:12px; font-weight:600; }
+    .trip-price { max-width:none; }
+    .typedate { grid-template-columns:1fr; gap:0; }
+    /* collapsible cards for things filled in once */
+    .fold h2 { cursor:pointer; display:flex; align-items:baseline; gap:8px; margin:0; user-select:none; }
+    .fold:not(.folded) h2 { margin-bottom:12px; }
+    .fold .chev { display:inline; margin-left:auto; font-size:14px; }
+    .fold.folded > :not(h2), .fold.folded h2 .sub { display:none !important; }
+    .fold.folded .fold-sum { display:inline; text-transform:none; letter-spacing:0; font-weight:400; color:var(--ink); font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+    .fold.folded .chev { transform:rotate(-90deg); }
+    /* preview is a full-screen view opened from the bottom bar */
+    #pv { display:none; }
+    body.preview { overflow:hidden; }
+    body.preview #pv { display:block; position:fixed; inset:0; z-index:4; overflow:auto; background:var(--bg);
+                       padding:64px 12px calc(92px + env(safe-area-inset-bottom)); }
+    #pv .paper { position:static; width:720px; min-height:0; }
+  }
 </style>
 </head>
 <body>
@@ -140,9 +186,10 @@
   </div>
   <div class="actions">
     <button id="themeBtn" type="button" title="Switch dark / light mode"></button>
-    <button id="openDrawer">📁 Invoices &amp; customers</button>
-    <button id="reset">New invoice</button>
-    <button id="download" class="primary">Download PDF</button>
+    <button id="openDrawer"><span class="ico">📁</span> <span class="lbl-long">Invoices &amp; customers</span><span class="lbl-short">Invoices</span></button>
+    <button id="previewBtn" class="phone-only" type="button"><span class="ico">📄</span><span>Preview</span></button>
+    <button id="reset"><span class="ico phone-ico">＋</span><span class="lbl-long">New invoice</span><span class="lbl-short">New</span></button>
+    <button id="download" class="primary"><span class="ico phone-ico">⤓</span><span class="lbl-long">Download PDF</span><span class="lbl-short">PDF</span></button>
   </div>
 </header>
 
@@ -177,8 +224,8 @@
       <label class="check"><input type="checkbox" id="showBank"> Include payment details on this invoice</label>
     </div>
 
-    <div class="card">
-      <h2>From <span class="sub">(your business · saved for all invoices)</span></h2>
+    <div class="card fold" id="fFrom">
+      <h2>From <span class="sub">(your business · saved for all invoices)</span><span class="fold-sum"></span><span class="chev">▾</span></h2>
       <div id="logoRow">
         <label style="flex:1;margin:0">Logo (optional)<input type="file" id="logo" accept="image/png,image/jpeg"></label>
         <img id="logoThumb" alt="">
@@ -202,8 +249,8 @@
       <button id="addTrip" type="button">+ Add trip</button>
     </div>
 
-    <div class="card">
-      <h2>Bank details <span class="sub">(saved for all invoices)</span></h2>
+    <div class="card fold" id="fBank">
+      <h2>Bank details <span class="sub">(saved for all invoices)</span><span class="fold-sum"></span><span class="chev">▾</span></h2>
       <label>Bank name<input id="bankName"></label>
       <div class="row">
         <label>IBAN<input id="iban"></label>
@@ -211,15 +258,15 @@
       </div>
     </div>
 
-    <div class="card">
-      <h2>Notes <span class="sub">(optional · only printed if filled in)</span></h2>
+    <div class="card fold" id="fNotes">
+      <h2>Notes <span class="sub">(optional · only printed if filled in)</span><span class="fold-sum"></span><span class="chev">▾</span></h2>
       <label>Notes<textarea id="notes"></textarea></label>
     </div>
   </section>
 
   <div id="splitter" title="Drag to resize (double-click to reset)"></div>
 
-  <section>
+  <section id="pv">
     <div class="paper" id="paper"></div>
   </section>
 </main>
@@ -353,7 +400,18 @@ function renderPreview() {
     <div class="p-total"><span>TOTAL</span><b>${money(totalOf(inv))}</b></div>
     ${bank.length && inv.showBank !== false ? `<div class="p-bank"><h4>Payment details</h4>${bank.concat([['Reference', inv.number]]).map(([k, v]) => `<div class="r"><span>${k}</span><b>${esc(v)}</b></div>`).join('')}</div>` : ''}
     ${inv.notes.trim() ? `<div class="p-notes"><h4>Notes</h4><div class="pre">${esc(inv.notes)}</div></div>` : ''}`;
+  renderFolds();
 }
+
+/* ---------- phone: collapsible cards (only visible on phones; harmless on desktop) ---------- */
+const foldSum = {
+  fFrom: () => biz.fromName.trim(),
+  fBank: () => biz.iban.trim() ? 'IBAN …' + biz.iban.replace(/\s/g, '').slice(-4) : biz.bankName.trim(),
+  fNotes: () => inv.notes.trim().split('\n')[0]
+};
+function renderFolds() { for (const id in foldSum) $(id).querySelector('.fold-sum').textContent = foldSum[id]() || 'Not filled in'; }
+function initFolds() { for (const id in foldSum) $(id).classList.toggle('folded', id === 'fNotes' || !!foldSum[id]()); }
+document.querySelectorAll('.fold h2').forEach(h => h.addEventListener('click', () => h.parentElement.classList.toggle('folded')));
 
 function update() { commit(); renderPreview(); }
 
@@ -363,7 +421,7 @@ function loadForm() {
   $('fromName').value = biz.fromName; $('fromAddr').value = biz.fromAddr; $('defaultFrom').value = biz.defaultFrom;
   $('bankName').value = biz.bankName; $('iban').value = biz.iban; $('bic').value = biz.bic;
   $('logoThumb').src = biz.logo || ''; $('logoThumb').style.display = biz.logo ? 'block' : 'none';
-  renderTrips(); renderPreview(); renderCustNames(); renderTypes(); renderStatus();
+  renderTrips(); renderPreview(); renderCustNames(); renderTypes(); renderStatus(); initFolds();
 }
 
 // invoice fields
@@ -484,12 +542,40 @@ function renderDrawer() {
     (!q && unnamed.length ? `<details class="cust"><summary><strong>No customer name</strong><span class="meta">${unnamed.length}</span></summary><div class="cust-body">${unnamed.map(row).join('')}</div></details>` : '')) ||
     `<div class="empty">${q ? 'No matches.' : onlyUnpaid ? 'Nothing unpaid. 🎉' : 'No saved invoices yet.<br>Invoices appear here as you create them.'}</div>`;
 }
-const openDrawer = () => { delArm = null; renderDrawer(); document.body.classList.add('open'); };
-const closeDrawer = () => document.body.classList.remove('open');
+// drawer / preview are "screens" on a phone: the Android back button closes them
+const overlayPush = () => { if (!history.state?.ov) history.pushState({ ov: 1 }, ''); };
+const overlayPop = () => {
+  const b = document.body.classList;
+  if (history.state?.ov && !b.contains('open') && !b.contains('preview')) history.back();
+};
+const openDrawer = () => { delArm = null; renderDrawer(); document.body.classList.add('open'); overlayPush(); };
+const closeDrawer = fromBack => {
+  if (!document.body.classList.contains('open')) return;
+  document.body.classList.remove('open');
+  if (!fromBack) overlayPop();
+};
 $('openDrawer').onclick = openDrawer;
-$('closeDrawer').onclick = closeDrawer;
-$('overlay').onclick = closeDrawer;
+$('closeDrawer').onclick = () => closeDrawer();
+$('overlay').onclick = () => closeDrawer();
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+
+/* ---------- phone: full-screen preview ---------- */
+const PHONE = matchMedia('(max-width: 700px) and (pointer: coarse)');
+const PAPER_W = 720;
+function fitPaper() {
+  $('paper').style.zoom = document.body.classList.contains('preview') ? Math.min(1, (innerWidth - 24) / PAPER_W) : '';
+}
+function setPreview(on, fromBack) {
+  if (document.body.classList.contains('preview') === on) return;
+  document.body.classList.toggle('preview', on);
+  $('previewBtn').innerHTML = on ? '<span class="ico">✎</span><span>Edit</span>' : '<span class="ico">📄</span><span>Preview</span>';
+  fitPaper();
+  if (on) { $('pv').scrollTop = 0; overlayPush(); } else if (!fromBack) overlayPop();
+}
+$('previewBtn').onclick = () => setPreview(!document.body.classList.contains('preview'));
+PHONE.addEventListener('change', () => { if (!PHONE.matches) setPreview(false); });
+addEventListener('resize', fitPaper);
+addEventListener('popstate', () => { closeDrawer(true); setPreview(false, true); });
 $('search').addEventListener('input', renderDrawer);
 $('onlyUnpaid').addEventListener('change', renderDrawer);
 $('custList').addEventListener('change', e => {
@@ -754,7 +840,11 @@ $('backupBtn').onclick = async () => {
 /* ---------- dark mode (editor only; the invoice preview and PDF stay light) ---------- */
 (() => {
   const root = document.documentElement, btn = $('themeBtn');
-  const paint = () => { const dark = root.dataset.theme === 'dark'; btn.textContent = dark ? '☀️ Light' : '🌙 Dark'; };
+  const paint = () => {
+    const dark = root.dataset.theme === 'dark';
+    btn.innerHTML = dark ? '☀️<span class="lbl"> Light</span>' : '🌙<span class="lbl"> Dark</span>';
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#181b22' : '#ffffff');
+  };
   btn.onclick = () => {
     root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
     try { localStorage.setItem('limo-theme', root.dataset.theme); } catch {}
@@ -767,6 +857,8 @@ $('backupBtn').onclick = async () => {
 load();
 loadForm();
 try { navigator.storage?.persist?.(); } catch {}
+// installable phone/web app: works offline once opened (not used by the desktop app, which loads from file://)
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
 </body>
 </html>

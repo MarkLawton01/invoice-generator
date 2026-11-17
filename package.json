@@ -5,7 +5,8 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder --win nsis portable"
+    "build": "electron-builder --win nsis portable",
+    "build:web": "node scripts/build-web.js"
   },
   "devDependencies": {
     "electron": "^33.2.0",
@@ -14,11 +15,24 @@
   "build": {
     "appId": "com.local.invoicegenerator",
     "productName": "Invoice Generator",
-    "files": ["main.js", "preload.js", "index.html", "vendor/**"],
-    "directories": { "output": "dist" },
-    "electronLanguages": ["en-US", "en-GB"],
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "vendor/**"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "electronLanguages": [
+      "en-US",
+      "en-GB"
+    ],
     "win": {
-      "target": ["nsis", "portable"],
+      "target": [
+        "nsis",
+        "portable"
+      ],
       "signAndEditExecutable": false
     },
     "nsis": {
@@ -29,6 +43,8 @@
       "runAfterFinish": true,
       "artifactName": "Invoice Generator Setup.exe"
     },
-    "portable": { "artifactName": "Invoice Generator.exe" }
+    "portable": {
+      "artifactName": "Invoice Generator.exe"
+    }
   }
 }
